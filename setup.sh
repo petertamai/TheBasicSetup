@@ -124,6 +124,16 @@ update_system() {
 install_docker() {
     if command_exists docker && command_exists docker-compose; then
         log_success "Docker and Docker Compose are already installed"
+        
+        # Make sure current user is in docker group
+        if ! groups | grep -q docker; then
+            log_warning "User $USER is not in the docker group. Adding now..."
+            sudo usermod -aG docker "$USER"
+            log_warning "IMPORTANT: Docker group permissions won't take effect until you either:"
+            echo -e "    ${YELLOW}newgrp docker${NC}    (for this session only)"
+            echo -e "    ${YELLOW}logout${NC} and log back in    (permanent fix)"
+        fi
+        
         return 0
     fi
     
@@ -156,7 +166,14 @@ install_docker() {
     sudo usermod -aG docker "$USER"
     
     log_success "Docker and Docker Compose installed"
-    log_warning "You may need to log out and back in for the docker group changes to take effect"
+    echo
+    log_warning "${BOLD}IMPORTANT: Docker permission fix required!${NC}"
+    echo -e "You will get a ${RED}'permission denied'${NC} error if you try to use Docker right now."
+    echo -e "${BOLD}Run ONE of these commands to fix it:${NC}"
+    echo -e "    ${YELLOW}newgrp docker${NC}    (temporary fix for this terminal session)"
+    echo -e "    ${YELLOW}logout${NC} and log back in    (permanent fix for all future sessions)"
+    echo
+    
     return 0
 }
 
@@ -397,12 +414,15 @@ print_usage_instructions() {
     echo
     echo -e "${BOLD}${BLUE}=== Usage Instructions ===${NC}"
     echo
+    echo -e "${BOLD}Docker Permission Fix (IMPORTANT):${NC}"
+    echo -e "If you get '${RED}permission denied${NC}' with Docker commands, run: ${YELLOW}newgrp docker${NC}"
+    echo
     echo -e "${BOLD}Adding a Domain to Caddy:${NC}"
     echo -e "Run: ${GREEN}caddyAddDomain${NC}"
     echo -e "This will guide you through adding a domain that points to a local port."
     echo
     echo -e "${BOLD}Docker Usage:${NC}"
-    echo -e "You can now use Docker commands without sudo:"
+    echo -e "After running ${YELLOW}newgrp docker${NC}, you can use these commands:"
     echo -e "${GREEN}docker ps${NC} - List running containers"
     echo -e "${GREEN}docker-compose up -d${NC} - Start containers defined in docker-compose.yml"
     echo
@@ -410,10 +430,11 @@ print_usage_instructions() {
     echo -e "${GREEN}sudo systemctl restart caddy${NC} - Restart Caddy server"
     echo
     echo -e "${BOLD}First Time Setup:${NC}"
-    echo -e "1. Deploy your application (e.g., on port 8080)"
-    echo -e "2. Run ${GREEN}caddyAddDomain${NC} and enter your domain and port"
-    echo -e "3. Ensure DNS for your domain points to this server"
-    echo -e "4. Access your site at https://yourdomain.com"
+    echo -e "1. Run ${YELLOW}newgrp docker${NC} to fix permissions"
+    echo -e "2. Deploy your application (e.g., on port 8080)"
+    echo -e "3. Run ${GREEN}caddyAddDomain${NC} and enter your domain and port"
+    echo -e "4. Ensure DNS for your domain points to this server"
+    echo -e "5. Access your site at https://yourdomain.com"
     echo
 }
 
@@ -525,7 +546,12 @@ main() {
     
     echo
     log_success "${BOLD}Installation process completed!${NC}"
-    log_info "Please log out and back in, or run 'source ~/.bashrc' to apply all changes."
+    
+    # Extra prominent Docker warning
+    echo -e "${RED}${BOLD}IMPORTANT:${NC} ${YELLOW}Before using Docker, run this command:${NC}"
+    echo -e "${GREEN}    newgrp docker${NC}"
+    echo
+    log_info "For all changes to fully take effect, log out and log back in."
 }
 
 # Run the main function
