@@ -426,28 +426,61 @@ install_node() {
 
 # Install Miniconda
 install_miniconda() {
-    if [ -d "$HOME/miniconda3" ] || command_exists conda; then
-        log_success "Miniconda is already installed"
+    # Get the real user's home directory, even if running with sudo
+    local real_user="${SUDO_USER:-$USER}"
+    local user_home=$(eval echo ~$real_user)
+    
+    # Check if Miniconda is already installed for this user
+    if [ -d "$user_home/miniconda3" ]; then
+        log_success "Miniconda is already installed at $user_home/miniconda3"
         return 0
     fi
     
-    log_info "Installing Miniconda..."
+    log_info "Installing Miniconda for user $real_user..."
+    
+    # Change to the user's home directory
+    cd "$user_home" || {
+        log_error "Failed to access user home directory $user_home"
+        return 1
+    }
     
     # Download Miniconda installer
     miniconda_installer="Miniconda3-latest-Linux-$(uname -m).sh"
-    wget "https://repo.anaconda.com/miniconda/${miniconda_installer}" -O ~/miniconda.sh
+    wget "https://repo.anaconda.com/miniconda/${miniconda_installer}" -O "$user_home/miniconda.sh"
     
-    # Run the installer in batch mode
-    bash ~/miniconda.sh -b -p "$HOME/miniconda3"
+    # Fix ownership of the installer
+    chown "$real_user:$real_user" "$user_home/miniconda.sh"
     
-    # Initialize conda for the shell
-    "$HOME/miniconda3/bin/conda" init bash
+    # Run the installer in batch mode as the real user
+    if [ "$USER" = "root" ] && [ "$real_user" != "root" ]; then
+        # We're running as root but installing for another user
+        su - "$real_user" -c "bash $user_home/miniconda.sh -b -p $user_home/miniconda3"
+    else
+        # We're running as the target user
+        bash "$user_home/miniconda.sh" -b -p "$user_home/miniconda3"
+    fi
+    
+    # Initialize conda for the real user's shell
+    if [ -f "$user_home/miniconda3/bin/conda" ]; then
+        if [ "$USER" = "root" ] && [ "$real_user" != "root" ]; then
+            # We're running as root but initializing for another user
+            su - "$real_user" -c "$user_home/miniconda3/bin/conda init bash"
+        else
+            # We're running as the target user
+            "$user_home/miniconda3/bin/conda" init bash
+        fi
+    else
+        log_error "Conda binary not found after installation"
+    fi
     
     # Clean up
-    rm ~/miniconda.sh
+    rm -f "$user_home/miniconda.sh"
     
-    log_success "Miniconda installed to $HOME/miniconda3"
-    log_warning "You may need to restart your shell for conda to be available"
+    # Ensure proper permissions on the entire miniconda directory
+    chown -R "$real_user:$real_user" "$user_home/miniconda3"
+    
+    log_success "Miniconda installed to $user_home/miniconda3"
+    log_info "To use conda immediately, run: source $user_home/.bashrc"
     return 0
 }
 

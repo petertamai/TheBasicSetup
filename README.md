@@ -7,7 +7,7 @@ A comprehensive one-command server installation script that automatically sets u
 ## 🚀 Quick Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/petertamai/TheBasicSetup/refs/heads/main/setup.sh -o setup.sh && chmod +x setup.sh && bash setup.sh
+cd $HOME && curl -sSL https://raw.githubusercontent.com/petertamai/TheBasicSetup/refs/heads/main/setup.sh -o setup.sh && chmod +x setup.sh && bash setup.sh
 ```
 
 ## ✨ What Does This Script Install?
