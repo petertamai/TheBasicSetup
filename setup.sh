@@ -472,9 +472,13 @@ main() {
             
             log_success "Setup script copied to /home/$username/setup.sh"
             echo
-            echo -e "${BOLD}${GREEN}=== Next Steps ===${NC}"
-            echo -e "1. Log in as user ${BOLD}$username${NC}"
-            echo -e "2. Run: ${BOLD}sudo bash setup.sh${NC}"
+            echo -e "${BOLD}${GREEN}=== EXACT COMMANDS TO RUN NEXT ===${NC}"
+            echo -e "${BOLD}Run these commands to complete installation:${NC}"
+            echo -e ""
+            echo -e "    ${YELLOW}su - $username${NC}"
+            echo -e "    ${YELLOW}sudo bash setup.sh${NC}"
+            echo -e ""
+            log_warning "DO NOT try to continue as root. Please follow the exact commands above."
             echo
             exit 0
         fi
