@@ -5,11 +5,43 @@
 # Website: https://petertam.pro/
 # Date: March 19, 2025
 
+# Make sure we're operating in the user's home directory
+# Get current user even if sudo
+REAL_USER=${SUDO_USER:-$USER}
+USER_HOME=$(eval echo ~$REAL_USER)
+
+# Check if we're not in the user's home directory
+if [ "$(pwd)" != "$USER_HOME" ]; then
+    # Check if home directory exists, create if it doesn't
+    if [ ! -d "$USER_HOME" ]; then
+        echo -e "\e[1;33mCreating home directory $USER_HOME\e[0m"
+        sudo mkdir -p "$USER_HOME"
+        sudo chown $REAL_USER:$REAL_USER "$USER_HOME"
+    fi
+    
+    echo -e "\e[1;33mChanging to home directory $USER_HOME\e[0m"
+    cd "$USER_HOME" || {
+        echo -e "\e[1;31mFailed to change to directory $USER_HOME\e[0m"
+        echo -e "\e[1;33mPlease run this script from your home directory.\e[0m"
+        exit 1
+    }
+    
+    # If the script was downloaded elsewhere, copy it to the home directory
+    SCRIPT_PATH=$(realpath "$0")
+    if [ "$SCRIPT_PATH" != "$USER_HOME/setup.sh" ]; then
+        echo -e "\e[1;33mCopying script to home directory\e[0m"
+        cp "$SCRIPT_PATH" "$USER_HOME/setup.sh"
+        chmod +x "$USER_HOME/setup.sh"
+        echo -e "\e[1;32mRestarting script from home directory\e[0m"
+        exec "$USER_HOME/setup.sh"
+        exit 0
+    fi
+fi
+
 # Check if current directory is writable
 if [ ! -w "$(pwd)" ]; then
     echo -e "\e[1;31mERROR: Cannot write to current directory $(pwd)\e[0m"
     echo -e "\e[1;33mPlease run this script from a directory where you have write permissions.\e[0m"
-    echo -e "For example, run: \e[1;32mcd \$HOME && curl -sSL https://raw.githubusercontent.com/petertamai/TheBasicSetup/refs/heads/main/setup.sh -o setup.sh && chmod +x setup.sh && bash setup.sh\e[0m"
     exit 1
 fi
 
