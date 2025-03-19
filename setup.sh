@@ -42,81 +42,6 @@ handle_error() {
 # Set up error trap
 trap 'handle_error $LINENO' ERR
 
-# Setup a sudo user (create new or use existing)
-setup_sudo_user() {
-    log_info "Setting up a sudo user..."
-    
-    # Prompt for username
-    read -p "Enter username: " username
-    if [ -z "$username" ]; then
-        log_error "Username cannot be empty"
-        return 1
-    fi
-    
-    # Check if user already exists
-    if id "$username" &>/dev/null; then
-        log_warning "User $username already exists"
-        
-        # Check if user has sudo privileges
-        if groups "$username" | grep -q '\bsudo\b'; then
-            log_info "User $username already has sudo privileges"
-        else
-            log_warning "User $username does not have sudo privileges"
-            read -p "Add sudo privileges to this user? (y/n): " add_sudo
-            if [[ "$add_sudo" =~ ^[Yy]$ ]]; then
-                sudo usermod -aG sudo "$username"
-                log_success "Sudo privileges added to user $username"
-            else
-                log_warning "User will not have sudo privileges. Some operations may fail."
-            fi
-        fi
-        
-        read -p "Continue installation as user $username? (y/n): " continue_choice
-        if [[ "$continue_choice" =~ ^[Yy]$ ]]; then
-            # Copy script to user's home directory
-            script_path=$(realpath "$0")
-            cp "$script_path" "/home/$username/setup.sh"
-            chown "$username:$username" "/home/$username/setup.sh"
-            chmod +x "/home/$username/setup.sh"
-                
-            # Switch to the user and continue installation
-            cd "/home/$username"
-            log_success "Switching to user $username and continuing installation..."
-            exec su - "$username" -c "cd /home/$username && sudo bash setup.sh"
-            exit 0
-        else
-            log_info "User selection cancelled."
-            return 1
-        fi
-    else
-        # Create the new user
-        sudo adduser "$username"
-        
-        # Add user to sudo group
-        sudo usermod -aG sudo "$username"
-        
-        # Create home directory if it doesn't exist
-        if [ ! -d "/home/$username" ]; then
-            sudo mkdir -p "/home/$username"
-            sudo chown "$username:$username" "/home/$username"
-        fi
-        
-        log_success "User $username created with sudo privileges"
-        
-        # Copy script to new user's home directory
-        script_path=$(realpath "$0")
-        cp "$script_path" "/home/$username/setup.sh"
-        chown "$username:$username" "/home/$username/setup.sh"
-        chmod +x "/home/$username/setup.sh"
-            
-        # Switch to the new user and continue installation
-        cd "/home/$username"
-        log_success "Switching to user $username and continuing installation..."
-        exec su - "$username" -c "cd /home/$username && sudo bash setup.sh"
-        exit 0
-    fi
-}
-
 # Function to check if a command exists
 command_exists() {
     command -v "$1" &> /dev/null
@@ -499,21 +424,68 @@ main() {
     echo -e "${BOLD}${BLUE}=====================================${NC}"
     echo
     
-    # Check if script is run as root
+    # Check if running as root without sudo
     if [ "$EUID" -eq 0 ] && [ -z "$SUDO_USER" ]; then
         log_warning "This script is being run as root without sudo."
         log_info "It's recommended to run this script as a regular user with sudo privileges."
         echo
-        read -p "Do you want to setup a sudo user for installation? (y/n): " create_user_choice
-        if [[ "$create_user_choice" =~ ^[Yy]$ ]]; then
-            setup_sudo_user
-            # The setup_sudo_user function will handle the switching and exit if successful
-            # If we get here, it means it didn't switch successfully
-            log_warning "User setup failed. Continuing as root..."
+        read -p "Do you want to setup a sudo user? (y/n): " setup_user_choice
+        if [[ "$setup_user_choice" =~ ^[Yy]$ ]]; then
+            # Get username
+            read -p "Enter username: " username
+            if [ -z "$username" ]; then
+                log_error "Username cannot be empty"
+                exit 1
+            fi
+            
+            # Check if user already exists
+            if id "$username" &>/dev/null; then
+                log_warning "User $username already exists"
+                
+                # Check if user has sudo privileges
+                if groups "$username" | grep -q '\bsudo\b'; then
+                    log_info "User $username already has sudo privileges"
+                else
+                    log_warning "User $username does not have sudo privileges"
+                    read -p "Add sudo privileges to this user? (y/n): " add_sudo
+                    if [[ "$add_sudo" =~ ^[Yy]$ ]]; then
+                        usermod -aG sudo "$username"
+                        log_success "Sudo privileges added to user $username"
+                    else
+                        log_warning "User will not have sudo privileges. Some operations may fail."
+                    fi
+                fi
+            else
+                # Create the new user
+                adduser "$username"
+                
+                # Add user to sudo group
+                usermod -aG sudo "$username"
+                log_success "User $username created with sudo privileges"
+            fi
+            
+            # Copy script to user's home directory and make it executable
+            script_path=$(realpath "$0")
+            cp "$script_path" "/home/$username/setup.sh"
+            chown "$username:$username" "/home/$username/setup.sh"
+            chmod +x "/home/$username/setup.sh"
+            
+            log_success "Setup script copied to /home/$username/setup.sh"
+            echo
+            echo -e "${BOLD}${GREEN}=== Next Steps ===${NC}"
+            echo -e "1. Log in as user ${BOLD}$username${NC}"
+            echo -e "2. Run: ${BOLD}sudo bash setup.sh${NC}"
+            echo
+            exit 0
         fi
     elif [ "$EUID" -ne 0 ]; then
-        log_warning "This script requires sudo privileges."
-        log_info "You will be prompted for your password when needed."
+        # Check if we have sudo privileges
+        if ! sudo -v &>/dev/null; then
+            log_error "This script requires sudo privileges but you don't have them."
+            log_info "Please run this script as a user with sudo privileges."
+            exit 1
+        fi
+        log_info "Running with sudo privileges. You may be prompted for your password."
     fi
     
     # Display already installed components
