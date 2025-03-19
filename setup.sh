@@ -42,12 +42,12 @@ handle_error() {
 # Set up error trap
 trap 'handle_error $LINENO' ERR
 
-# Create a new sudo user
+# Create a new sudo user or use existing
 create_sudo_user() {
-    log_info "Setting up a new sudo user..."
+    log_info "Setting up a sudo user..."
     
     # Prompt for username
-    read -p "Enter new username: " username
+    read -p "Enter username: " username
     if [ -z "$username" ]; then
         log_error "Username cannot be empty"
         return 1
@@ -56,6 +56,21 @@ create_sudo_user() {
     # Check if user already exists
     if id "$username" &>/dev/null; then
         log_warning "User $username already exists"
+        
+        # Check if user has sudo privileges
+        if groups "$username" | grep -q '\bsudo\b'; then
+            log_info "User $username already has sudo privileges"
+        else
+            log_warning "User $username does not have sudo privileges"
+            read -p "Add sudo privileges to this user? (y/n): " add_sudo
+            if [[ "$add_sudo" =~ ^[Yy]$ ]]; then
+                sudo usermod -aG sudo "$username"
+                log_success "Sudo privileges added to user $username"
+            else
+                log_warning "User will not have sudo privileges. Some operations may fail."
+            fi
+        fi
+        
         read -p "Do you want to continue installation as this user? (y/n): " continue_choice
         if [[ "$continue_choice" =~ ^[Yy]$ ]]; then
             target_user="$username"
@@ -472,24 +487,24 @@ main() {
         log_warning "This script is being run as root without sudo."
         log_info "It's recommended to run this script as a regular user with sudo privileges."
         echo
-        read -p "Do you want to create a new sudo user for installation? (y/n): " create_user_choice
+        read -p "Do you want to setup a sudo user for installation? (y/n): " create_user_choice
         if [[ "$create_user_choice" =~ ^[Yy]$ ]]; then
             if create_sudo_user; then
-                log_success "User $target_user created successfully."
+                # Check if we're using an existing user or created a new one
                 log_info "Continuing installation as user $target_user..."
                 
-                # Copy script to new user's home directory
+                # Copy script to user's home directory
                 script_path=$(realpath "$0")
                 cp "$script_path" "/home/$target_user/setup.sh"
                 chown "$target_user:$target_user" "/home/$target_user/setup.sh"
                 chmod +x "/home/$target_user/setup.sh"
                 
-                # Switch to the new user and continue installation
+                # Switch to the user and continue installation
                 cd "/home/$target_user"
                 exec su - "$target_user" -c "cd /home/$target_user && sudo bash setup.sh"
                 exit 0
             else
-                log_warning "User creation cancelled or failed. Continuing as root..."
+                log_warning "User setup cancelled. Continuing as root..."
             fi
         fi
     elif [ "$EUID" -ne 0 ]; then
