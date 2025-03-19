@@ -487,11 +487,20 @@ main() {
             
             # Copy script to user's home directory and make it executable
             script_path=$(realpath "$0")
-            cp "$script_path" "/home/$username/setup.sh"
-            chown "$username:$username" "/home/$username/setup.sh"
-            chmod +x "/home/$username/setup.sh"
+            script_dir=$(dirname "$script_path")
+            target_path="/home/$username/setup.sh"
             
-            log_success "Setup script copied to /home/$username/setup.sh"
+            # Only copy if we're not already in the user's home directory
+            if [ "$script_path" != "$target_path" ]; then
+                cp "$script_path" "$target_path"
+                chown "$username:$username" "$target_path"
+                chmod +x "$target_path"
+                log_success "Setup script copied to $target_path"
+            else
+                log_info "Script is already in $username's home directory"
+                chown "$username:$username" "$script_path"
+                chmod +x "$script_path"
+            fi
             echo
             echo -e "${BOLD}${GREEN}=== EXACT COMMANDS TO RUN NEXT ===${NC}"
             echo -e "${BOLD}Run these commands to complete installation:${NC}"
