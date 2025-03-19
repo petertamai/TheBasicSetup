@@ -2,10 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+.gprsa
 # C extensions
 *.so
-
+github_setup.py
 # Distribution / packaging
 .Python
 build/
