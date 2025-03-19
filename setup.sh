@@ -42,8 +42,8 @@ handle_error() {
 # Set up error trap
 trap 'handle_error $LINENO' ERR
 
-# Create a new sudo user or use existing
-create_sudo_user() {
+# Setup a sudo user (create new or use existing)
+setup_sudo_user() {
     log_info "Setting up a sudo user..."
     
     # Prompt for username
@@ -71,30 +71,50 @@ create_sudo_user() {
             fi
         fi
         
-        read -p "Do you want to continue installation as this user? (y/n): " continue_choice
+        read -p "Continue installation as user $username? (y/n): " continue_choice
         if [[ "$continue_choice" =~ ^[Yy]$ ]]; then
-            target_user="$username"
-            return 0
+            # Copy script to user's home directory
+            script_path=$(realpath "$0")
+            cp "$script_path" "/home/$username/setup.sh"
+            chown "$username:$username" "/home/$username/setup.sh"
+            chmod +x "/home/$username/setup.sh"
+                
+            # Switch to the user and continue installation
+            cd "/home/$username"
+            log_success "Switching to user $username and continuing installation..."
+            exec su - "$username" -c "cd /home/$username && sudo bash setup.sh"
+            exit 0
         else
+            log_info "User selection cancelled."
             return 1
         fi
+    else
+        # Create the new user
+        sudo adduser "$username"
+        
+        # Add user to sudo group
+        sudo usermod -aG sudo "$username"
+        
+        # Create home directory if it doesn't exist
+        if [ ! -d "/home/$username" ]; then
+            sudo mkdir -p "/home/$username"
+            sudo chown "$username:$username" "/home/$username"
+        fi
+        
+        log_success "User $username created with sudo privileges"
+        
+        # Copy script to new user's home directory
+        script_path=$(realpath "$0")
+        cp "$script_path" "/home/$username/setup.sh"
+        chown "$username:$username" "/home/$username/setup.sh"
+        chmod +x "/home/$username/setup.sh"
+            
+        # Switch to the new user and continue installation
+        cd "/home/$username"
+        log_success "Switching to user $username and continuing installation..."
+        exec su - "$username" -c "cd /home/$username && sudo bash setup.sh"
+        exit 0
     fi
-    
-    # Create the user
-    sudo adduser "$username"
-    
-    # Add user to sudo group
-    sudo usermod -aG sudo "$username"
-    
-    # Create home directory if it doesn't exist
-    if [ ! -d "/home/$username" ]; then
-        sudo mkdir -p "/home/$username"
-        sudo chown "$username:$username" "/home/$username"
-    fi
-    
-    target_user="$username"
-    log_success "User $username created with sudo privileges"
-    return 0
 }
 
 # Function to check if a command exists
@@ -208,10 +228,7 @@ install_docker() {
     sudo apt-get install -y docker-compose
     
     # Add current user to the docker group
-    sudo usermod -aG docker "$SUDO_USER"
-    if [ -n "$target_user" ]; then
-        sudo usermod -aG docker "$target_user"
-    fi
+    sudo usermod -aG docker "$USER"
     
     log_success "Docker and Docker Compose installed"
     log_warning "You may need to log out and back in for the docker group changes to take effect"
@@ -489,23 +506,10 @@ main() {
         echo
         read -p "Do you want to setup a sudo user for installation? (y/n): " create_user_choice
         if [[ "$create_user_choice" =~ ^[Yy]$ ]]; then
-            if create_sudo_user; then
-                # Check if we're using an existing user or created a new one
-                log_info "Continuing installation as user $target_user..."
-                
-                # Copy script to user's home directory
-                script_path=$(realpath "$0")
-                cp "$script_path" "/home/$target_user/setup.sh"
-                chown "$target_user:$target_user" "/home/$target_user/setup.sh"
-                chmod +x "/home/$target_user/setup.sh"
-                
-                # Switch to the user and continue installation
-                cd "/home/$target_user"
-                exec su - "$target_user" -c "cd /home/$target_user && sudo bash setup.sh"
-                exit 0
-            else
-                log_warning "User setup cancelled. Continuing as root..."
-            fi
+            setup_sudo_user
+            # The setup_sudo_user function will handle the switching and exit if successful
+            # If we get here, it means it didn't switch successfully
+            log_warning "User setup failed. Continuing as root..."
         fi
     elif [ "$EUID" -ne 0 ]; then
         log_warning "This script requires sudo privileges."
