@@ -6,15 +6,17 @@ A comprehensive one-command server installation script that automatically sets u
 
 ## 🚀 Quick Install
 
+**IMPORTANT**: Run this command from your home directory to avoid permission issues:
+
 ```bash
-cd $HOME && curl -sSL https://raw.githubusercontent.com/petertamai/TheBasicSetup/refs/heads/main/setup.sh -o setup.sh && chmod +x setup.sh && bash setup.sh
+cd $HOME && curl -sSL https://raw.githubusercontent.com/petertamai/TheBasicSetup/main/setup.sh -o setup.sh && chmod +x setup.sh && bash setup.sh
 ```
 
 ## ✨ What Does This Script Install?
 
 This script provides a complete development environment setup with:
 
-- **Docker & Docker Compose** - With proper user permissions
+- **Docker & Docker Compose** - With working permissions for immediate use
 - **Caddy Server** - Modern web server with automatic HTTPS
 - **Node.js & npm** - Latest LTS version
 - **pnpm** - Fast, disk space efficient package manager
@@ -24,7 +26,11 @@ This script provides a complete development environment setup with:
 ## 🛠️ Features
 
 - **One-Command Setup**: Complete environment configuration with a single command
+- **Smart User Management**: Creates or configures sudo users automatically
+- **Bulletproof Permissions**: Fixes Docker permissions for immediate use
+- **Intelligent Directory Handling**: Automatically uses the correct home directory
 - **Interactive Domain Setup**: Easily configure domains with the included `caddyAddDomain` tool
+- **User-Specific Installations**: Properly installs software for the correct user
 - **Robust Error Handling**: Comprehensive logging and error management
 - **Idempotent Design**: Can be run multiple times without issues
 - **Security Best Practices**: Proper repository verification and secure installation methods
@@ -35,7 +41,8 @@ This script provides a complete development environment setup with:
 ### Docker & Docker Compose
 - Installs the latest stable Docker Engine
 - Sets up Docker Compose for container orchestration
-- Adds the current user to the docker group (no sudo needed for docker commands)
+- Adds all users to the docker group
+- **Fixes socket permissions for immediate use without logging out**
 
 ### Caddy Server
 - Modern web server with automatic HTTPS
@@ -48,7 +55,7 @@ This script provides a complete development environment setup with:
 - Installs pnpm for improved package management
 
 ### Miniconda
-- Python environment management
+- User-specific Python environment management
 - Conda initialization for your shell
 - Ready for data science and Python development
 
@@ -63,7 +70,7 @@ A custom utility that makes it easy to:
 After installation, you can easily configure new domains:
 
 ```bash
-caddyAddDomain
+sudo caddyAddDomain  # sudo is required
 ```
 
 The tool will:
@@ -82,19 +89,17 @@ The tool will:
 
 ## 🔧 Troubleshooting
 
-### Docker Group Permissions
-If Docker commands require sudo after installation, you may need to log out and back in for group changes to take effect, or run:
+### Docker Commands Working Immediately
+The script fixes Docker socket permissions, so Docker commands should work immediately without the need to log out or use group commands.
 
-```bash
-newgrp docker
-```
+### Running the Script from the Wrong Directory
+If you try to run the script from a directory where you don't have write permissions (like `/root`), the script will automatically:
+- Detect the issue
+- Change to your home directory
+- Continue installation from there
 
-### Conda Command Not Found
-If the conda command isn't available after installation, initialize your shell with:
-
-```bash
-source ~/.bashrc
-```
+### Miniconda Permissions
+Miniconda is installed specifically for your user with proper permissions, avoiding any issues with root-owned files in your home directory.
 
 ## 📄 License
 
