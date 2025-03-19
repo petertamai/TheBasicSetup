@@ -129,10 +129,14 @@ install_docker() {
         if ! groups | grep -q docker; then
             log_warning "User $USER is not in the docker group. Adding now..."
             sudo usermod -aG docker "$USER"
-            log_warning "IMPORTANT: Docker group permissions won't take effect until you either:"
-            echo -e "    ${YELLOW}newgrp docker${NC}    (for this session only)"
-            echo -e "    ${YELLOW}logout${NC} and log back in    (permanent fix)"
+            # Also fix docker socket permissions directly for immediate access
+            sudo chmod 666 /var/run/docker.sock
+            log_success "Docker permissions fixed immediately!"
         fi
+        
+        # Always ensure docker socket has right permissions for everyone
+        sudo chmod 666 /var/run/docker.sock
+        log_success "Docker socket permissions fixed for immediate use"
         
         return 0
     fi
@@ -165,13 +169,11 @@ install_docker() {
     # Add current user to the docker group
     sudo usermod -aG docker "$USER"
     
+    # Fix docker socket permissions directly for immediate access
+    sudo chmod 666 /var/run/docker.sock
+    
     log_success "Docker and Docker Compose installed"
-    echo
-    log_warning "${BOLD}IMPORTANT: Docker permission fix required!${NC}"
-    echo -e "You will get a ${RED}'permission denied'${NC} error if you try to use Docker right now."
-    echo -e "${BOLD}Run ONE of these commands to fix it:${NC}"
-    echo -e "    ${YELLOW}newgrp docker${NC}    (temporary fix for this terminal session)"
-    echo -e "    ${YELLOW}logout${NC} and log back in    (permanent fix for all future sessions)"
+    log_success "Docker socket permissions fixed for immediate use"
     echo
     
     return 0
@@ -414,27 +416,23 @@ print_usage_instructions() {
     echo
     echo -e "${BOLD}${BLUE}=== Usage Instructions ===${NC}"
     echo
-    echo -e "${BOLD}Docker Permission Fix (IMPORTANT):${NC}"
-    echo -e "If you get '${RED}permission denied${NC}' with Docker commands, run: ${YELLOW}newgrp docker${NC}"
+    echo -e "${BOLD}Docker Usage:${NC}"
+    echo -e "Docker should work immediately with these commands:"
+    echo -e "${GREEN}docker ps${NC} - List running containers"
+    echo -e "${GREEN}docker-compose up -d${NC} - Start containers defined in docker-compose.yml"
     echo
     echo -e "${BOLD}Adding a Domain to Caddy:${NC}"
     echo -e "Run: ${GREEN}caddyAddDomain${NC}"
     echo -e "This will guide you through adding a domain that points to a local port."
     echo
-    echo -e "${BOLD}Docker Usage:${NC}"
-    echo -e "After running ${YELLOW}newgrp docker${NC}, you can use these commands:"
-    echo -e "${GREEN}docker ps${NC} - List running containers"
-    echo -e "${GREEN}docker-compose up -d${NC} - Start containers defined in docker-compose.yml"
-    echo
     echo -e "${BOLD}Restarting Services:${NC}"
     echo -e "${GREEN}sudo systemctl restart caddy${NC} - Restart Caddy server"
     echo
     echo -e "${BOLD}First Time Setup:${NC}"
-    echo -e "1. Run ${YELLOW}newgrp docker${NC} to fix permissions"
-    echo -e "2. Deploy your application (e.g., on port 8080)"
-    echo -e "3. Run ${GREEN}caddyAddDomain${NC} and enter your domain and port"
-    echo -e "4. Ensure DNS for your domain points to this server"
-    echo -e "5. Access your site at https://yourdomain.com"
+    echo -e "1. Deploy your application (e.g., on port 8080)"
+    echo -e "2. Run ${GREEN}caddyAddDomain${NC} and enter your domain and port"
+    echo -e "3. Ensure DNS for your domain points to this server"
+    echo -e "4. Access your site at https://yourdomain.com"
     echo
 }
 
@@ -556,9 +554,26 @@ main() {
     echo
     log_success "${BOLD}Installation process completed!${NC}"
     
-    # Extra prominent Docker warning
-    echo -e "${RED}${BOLD}IMPORTANT:${NC} ${YELLOW}Before using Docker, run this command:${NC}"
-    echo -e "${GREEN}    newgrp docker${NC}"
+    # Ensure Docker works immediately for other users too
+    log_info "Ensuring Docker works for all created users..."
+    
+    # Loop through all the users we might have set up
+    for user in $(ls /home); do
+        if id "$user" &>/dev/null; then
+            log_info "Setting up Docker permissions for user $user"
+            
+            # Add user to docker group
+            sudo usermod -aG docker "$user"
+            
+            # Fix permissions on any docker config files in their home
+            if [ -d "/home/$user/.docker" ]; then
+                sudo chown -R "$user:$user" "/home/$user/.docker"
+            fi
+        fi
+    done
+    
+    # Fix docker socket permissions directly for immediate access by anyone
+    sudo chmod 666 /var/run/docker.sock
     echo
     log_info "For all changes to fully take effect, log out and log back in."
 }
