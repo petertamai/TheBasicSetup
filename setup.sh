@@ -495,7 +495,7 @@ print_usage_instructions() {
     echo -e "${GREEN}docker-compose up -d${NC} - Start containers defined in docker-compose.yml"
     echo
     echo -e "${BOLD}Adding a Domain to Caddy:${NC}"
-    echo -e "Run: ${GREEN}caddyAddDomain${NC}"
+    echo -e "Run: ${GREEN}sudo caddyAddDomain${NC}  (⚠️ sudo is required)"
     echo -e "This will guide you through adding a domain that points to a local port."
     echo
     echo -e "${BOLD}Restarting Services:${NC}"
@@ -503,7 +503,7 @@ print_usage_instructions() {
     echo
     echo -e "${BOLD}First Time Setup:${NC}"
     echo -e "1. Deploy your application (e.g., on port 8080)"
-    echo -e "2. Run ${GREEN}caddyAddDomain${NC} and enter your domain and port"
+    echo -e "2. Run ${GREEN}sudo caddyAddDomain${NC} and enter your domain and port"
     echo -e "3. Ensure DNS for your domain points to this server"
     echo -e "4. Access your site at https://yourdomain.com"
     echo
