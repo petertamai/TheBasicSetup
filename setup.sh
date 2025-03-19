@@ -5,6 +5,14 @@
 # Website: https://petertam.pro/
 # Date: March 19, 2025
 
+# Check if current directory is writable
+if [ ! -w "$(pwd)" ]; then
+    echo -e "\e[1;31mERROR: Cannot write to current directory $(pwd)\e[0m"
+    echo -e "\e[1;33mPlease run this script from a directory where you have write permissions.\e[0m"
+    echo -e "For example, run: \e[1;32mcd \$HOME && curl -sSL https://raw.githubusercontent.com/petertamai/TheBasicSetup/refs/heads/main/setup.sh -o setup.sh && chmod +x setup.sh && bash setup.sh\e[0m"
+    exit 1
+fi
+
 # Set strict mode
 set -e
 
