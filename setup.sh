@@ -475,7 +475,18 @@ main() {
         read -p "Do you want to create a new sudo user for installation? (y/n): " create_user_choice
         if [[ "$create_user_choice" =~ ^[Yy]$ ]]; then
             if create_sudo_user; then
-                log_success "User created successfully. Please re-run this script as that user with sudo."
+                log_success "User $target_user created successfully."
+                log_info "Continuing installation as user $target_user..."
+                
+                # Copy script to new user's home directory
+                script_path=$(realpath "$0")
+                cp "$script_path" "/home/$target_user/setup.sh"
+                chown "$target_user:$target_user" "/home/$target_user/setup.sh"
+                chmod +x "/home/$target_user/setup.sh"
+                
+                # Switch to the new user and continue installation
+                cd "/home/$target_user"
+                exec su - "$target_user" -c "cd /home/$target_user && sudo bash setup.sh"
                 exit 0
             else
                 log_warning "User creation cancelled or failed. Continuing as root..."
