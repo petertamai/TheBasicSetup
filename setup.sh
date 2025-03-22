@@ -3,7 +3,7 @@
 # setup.sh - Comprehensive environment setup script
 # Author: Piotr Tamulewicz (pt@petertam.pro)
 # Website: https://petertam.pro/
-# Date: March 19, 2025
+# Date: March 22, 2025
 
 # Make sure we're operating in the user's home directory
 # Get current user even if sudo
@@ -140,6 +140,13 @@ check_installed_components() {
         components="${components}${GREEN}✓ pnpm${NC} ($(pnpm --version))\n"
     else
         components="${components}${RED}✗ pnpm${NC} (Not installed)\n"
+    fi
+    
+    # Check PM2
+    if command_exists pm2; then
+        components="${components}${GREEN}✓ PM2${NC} ($(pm2 --version))\n"
+    else
+        components="${components}${RED}✗ PM2${NC} (Not installed)\n"
     fi
     
     # Check Miniconda
@@ -424,6 +431,50 @@ install_node() {
     return 0
 }
 
+# Install PM2 globally
+install_pm2() {
+    if command_exists pm2; then
+        log_success "PM2 is already installed"
+        # Ensure PM2 is up to date
+        npm update -g pm2
+        log_success "PM2 updated to the latest version"
+        pm2_version=$(pm2 --version)
+        log_info "PM2 version: $pm2_version"
+        return 0
+    fi
+    
+    log_info "Installing PM2 globally..."
+    
+    # Check if Node.js and npm are installed
+    if ! command_exists npm; then
+        log_warning "npm is not installed. Installing Node.js first..."
+        install_node
+    fi
+    
+    # Install PM2
+    npm install -g pm2
+    
+    # Check if installation was successful
+    if command_exists pm2; then
+        log_success "PM2 installed successfully"
+        pm2_version=$(pm2 --version)
+        log_info "PM2 version: $pm2_version"
+        
+        # Configure PM2 to start on boot
+        log_info "Setting up PM2 to start on system boot..."
+        pm2 startup | tail -n 1 > /tmp/pm2-startup-command.sh
+        chmod +x /tmp/pm2-startup-command.sh
+        sudo bash /tmp/pm2-startup-command.sh
+        rm /tmp/pm2-startup-command.sh
+        log_success "PM2 startup configuration applied"
+    else
+        log_error "Failed to install PM2. Please check npm installation and try again."
+        return 1
+    fi
+    
+    return 0
+}
+
 # Install Miniconda
 install_miniconda() {
     # Get the real user's home directory, even if running with sudo
@@ -498,11 +549,18 @@ print_usage_instructions() {
     echo -e "Run: ${GREEN}sudo caddyAddDomain${NC}  (⚠️ sudo is required)"
     echo -e "This will guide you through adding a domain that points to a local port."
     echo
+    echo -e "${BOLD}PM2 Usage:${NC}"
+    echo -e "${GREEN}pm2 start app.js${NC} - Start a Node.js application with PM2"
+    echo -e "${GREEN}pm2 list${NC} - List all applications managed by PM2"
+    echo -e "${GREEN}pm2 monit${NC} - Monitor all applications in real-time"
+    echo -e "${GREEN}pm2 save${NC} - Save the current process list for automatic restart"
+    echo -e "${GREEN}pm2 startup${NC} - Generate startup script to automatically start PM2 on boot"
+    echo
     echo -e "${BOLD}Restarting Services:${NC}"
     echo -e "${GREEN}sudo systemctl restart caddy${NC} - Restart Caddy server"
     echo
     echo -e "${BOLD}First Time Setup:${NC}"
-    echo -e "1. Deploy your application (e.g., on port 8080)"
+    echo -e "1. Deploy your application (e.g., with ${GREEN}pm2 start app.js${NC} on port 8080)"
     echo -e "2. Run ${GREEN}sudo caddyAddDomain${NC} and enter your domain and port"
     echo -e "3. Ensure DNS for your domain points to this server"
     echo -e "4. Access your site at https://yourdomain.com"
@@ -613,6 +671,7 @@ main() {
     install_caddy
     create_caddy_domain_script
     install_node
+    install_pm2
     install_miniconda
     
     # Print final summary
